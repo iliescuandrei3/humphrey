@@ -23,7 +23,8 @@ app.use(express.urlencoded({ extended: false }));
 
 const mongoUrl = process.env.MONGO_URL || 'mongodb://localhost:27017/spotify-api-project';
 
-mongoose.connect(mongoUrl);
+mongoose.connect(mongoUrl, { dbName: process.env.MONGO_DB || 'spotify-api-project' })
+    .catch(error => console.error('MongoDB connection error:', error));
 
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
@@ -53,9 +54,9 @@ app.get('/error', (req,res) =>
 
 app.get('/:id', async (req,res) =>
 {
-    const id = req.params.id;
-    if(id)
+    try
     {
+        const id = req.params.id;
         let dbInfo = await Artist.findOne({artistId: id});
         if(dbInfo)
         {
@@ -65,11 +66,17 @@ app.get('/:id', async (req,res) =>
                 artistName: dbInfo.name,
                 links: []
             };
-            while(degree != 0)
+            while(degree !== 0)
             {
+                if(!dbInfo.artistReach.length)
+                    throw new Error(`Artist ${dbInfo.artistId} has no reachable artists`);
+
                 const rand = Math.floor( Math.random() * dbInfo.artistReach.length);
-                result.links.push(dbInfo.artistReach[rand]);
-                dbInfo = await Artist.findOne({artistId: dbInfo.artistReach[rand].artistId});
+                const nextArtist = dbInfo.artistReach[rand];
+                result.links.push(nextArtist);
+                dbInfo = await Artist.findOne({artistId: nextArtist.artistId});
+                if(!dbInfo)
+                    throw new Error(`Artist ${nextArtist.artistId} was not found`);
                 degree = dbInfo.degree;
             }
             res.render('main.ejs', {result});
@@ -80,7 +87,11 @@ app.get('/:id', async (req,res) =>
             res.render('main.ejs',{result: 'Artist not found'});
         }
     }
-    else res.render('main.ejs',{result: undefined});
+    catch(error)
+    {
+        console.error('Artist lookup failed:', error);
+        res.status(500).render('main.ejs', {result: 'Database lookup failed'});
+    }
 })
 
 app.post('/search', async (req,res) =>
