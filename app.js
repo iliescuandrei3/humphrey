@@ -19,16 +19,11 @@ app.engine('ejs', engine);
 app.set('views', path.join(__dirname, '/views'));
 app.set('view engine', 'ejs');
 
-app.use(express.urlencoded());
+app.use(express.urlencoded({ extended: false }));
 
 const mongoUrl = process.env.MONGO_URL || 'mongodb://localhost:27017/spotify-api-project';
 
-mongoose.connect(mongoUrl, 
-{
-    useNewUrlParser: true, 
-    useUnifiedTopology: true,
-    useFindAndModify: false
-});
+mongoose.connect(mongoUrl);
 
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
